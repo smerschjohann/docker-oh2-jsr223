@@ -1,0 +1,15 @@
+version: '2'
+
+services:
+    openhab:
+        build: .
+        restart: always
+        volumes:
+            - "/etc/localtime:/etc/localtime:ro"
+            - "/etc/timezone:/etc/timezone:ro"
+            - "run/userdata:/openhab/userdata"
+            - "run/conf:/openhab/conf"
+            - "addons:/openhab/addons"
+        ports:
+            - 8080:8080
+        command: "server"
