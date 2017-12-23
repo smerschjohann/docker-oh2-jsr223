@@ -12,7 +12,7 @@ class CountdownTimer(Rule):
         ]
 
     def timerEval(self):
-        timerCurrent = ItemRegistry.getItem(self.timerCurrent)
+        timerCurrent = ir.getItem(self.timerCurrent)
         remaining = timerCurrent.state.intValue() - 1
 
         if remaining > 0:
@@ -24,8 +24,12 @@ class CountdownTimer(Rule):
             self.timer = None
 
     def execute(self, event):
-        if event.command == OnOffType.ON:
-            timerDuration = ItemRegistry.getItem(self.timerDuration)
+        print dir(event), event
+        print event.itemCommand
+        if str(event.itemCommand) == "ON":
+            print "timer activated..." 
+            timerDuration = ir.getItem(self.timerDuration)
+            print str(timerDuration), dir(timerDuration)
             oh.postUpdate(self.timerCurrent, str(timerDuration.state))
             self.timer = oh.createTimer(DateTime.now().plusMinutes(1), self.timerEval)
 

@@ -24,14 +24,15 @@ class AlarmClock(Rule):
 
         if event.command == OnOffType.ON:
             try:
-                hours = ItemRegistry.getItem(self.itemHours).state.intValue()
-                minutes = ItemRegistry.getItem(self.itemMinutes).state.intValue()
+                hours = ir.getItem(self.itemHours).state.intValue()
+                minutes = ir.getItem(self.itemMinutes).state.intValue()
 
                 today = DateTime.now().withTimeAtStartOfDay()
                 atClock = today.plusHours(hours).plusMinutes(minutes)
 
                 if atClock < DateTime.now():
                     atClock = atClock.plusDays(1)
+                self.log.info("AlarmClock scheduled at {}", atClock)
                 self.timer = oh.createTimer(atClock, self.triggerAlarm)
             except Exception, e:
-                print e
+                self.log.error("AlarmClock could not get hour and minutes: {}", e)

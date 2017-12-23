@@ -16,7 +16,9 @@ class ExecRule(Rule):
         return events
 
     def execute(self, event):
-        item_map = self.commandMap[event.item.name]
-        triggered = str(event.command)
+        print event, dir(event)
+        
+        item_map = self.commandMap[event.itemName]
+        triggered = str(event.itemCommand)
         cmd = item_map[triggered]
         self.commandTriggered(cmd)

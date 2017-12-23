@@ -10,6 +10,8 @@ services:
             - "run/userdata:/openhab/userdata"
             - "run/conf:/openhab/conf"
             - "addons:/openhab/addons"
-        ports:
-            - 8080:8080
-        command: "server"
+        environment:
+            OPENHAB_HTTP_PORT: 8080
+            OPENHAB_HTTPS_PORT: 18443
+        network_mode: "host"
+        tty: true
