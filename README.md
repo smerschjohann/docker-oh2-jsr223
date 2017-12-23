@@ -9,7 +9,5 @@ This repository contains all necessary files to run the scriptable automation PR
 # Installation steps
 - `git clone git@github.com:smerschjohann/docker-oh2-jsr223.git`
 - `docker-compose build`
-- on first start comment out the `addons` volume
 - start with `docker-compose up -d`
-  - note: if you get an error KARAF_ETC missing. run `docker-compose down`, remove everything again from userdata and comment out the volume addons from the docker-compose.yml. Restart it, stop it again and copy the automation files back in.
 - look at it with docker-compose logs -f and tail -f run/userdata/logs/openhab.log. It should load up the oh1compat.py after around 20 seconds.
