@@ -24,13 +24,13 @@ class CountdownTimer(Rule):
             self.timer = None
 
     def execute(self, event):
-        print dir(event), event
-        print event.itemCommand
+        self.log.info("timer {} => {}", event.itemName, event.itemCommand)
         if str(event.itemCommand) == "ON":
-            print "timer activated..." 
             timerDuration = ir.getItem(self.timerDuration)
-            print str(timerDuration), dir(timerDuration)
+            self.log.info("timer activated duration={}", str(timerDuration.state))
             oh.postUpdate(self.timerCurrent, str(timerDuration.state))
+            if self.timer:
+                self.timer.cancel()
             self.timer = oh.createTimer(DateTime.now().plusMinutes(1), self.timerEval)
 
         else:
