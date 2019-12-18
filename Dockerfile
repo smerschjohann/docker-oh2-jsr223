@@ -1,4 +1,4 @@
-FROM openhab/openhab:2.2.0-amd64-debian
+FROM openhab/openhab:2.5.0-debian
 MAINTAINER Simon Merschjohann <smerschjo@gmail.com>
 
 ENV CLASSPATH /opt/jython/jython.jar

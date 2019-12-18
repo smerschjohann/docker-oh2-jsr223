@@ -2,8 +2,14 @@ se.importPreset("RuleSupport")
 se.importPreset("RuleSimple")
 se.importPreset("RuleFactories")
 
-from org.eclipse.smarthome.automation.handler import TriggerHandler
+from org.openhab.core.automation.handler import TriggerHandler
 import uuid
+
+print se.presets
+print dir()
+
+def _buildTrigger(uid, typeUID, config):
+    return TriggerBuilder.create().withId(uid).withTypeUID(typeUID).withConfiguration(config).build()
 
 class _StartupTriggerHandlerFactory(TriggerHandlerFactory):
     class Handler(TriggerHandler):
@@ -26,16 +32,17 @@ STARTUP_MODULE_ID = "jsr223.StartupTrigger"
 automationManager.addTriggerType(TriggerType(STARTUP_MODULE_ID, [], []))
 automationManager.addTriggerHandler(STARTUP_MODULE_ID, _StartupTriggerHandlerFactory())
 
+
 def StartupTrigger(triggerName=None):
     triggerName = triggerName or uuid.uuid1().hex
-    return Trigger(triggerName, STARTUP_MODULE_ID, Configuration())
+    return _buildTrigger(triggerName, STARTUP_MODULE_ID, Configuration())
 
 
 def ChangedEventTrigger(itemName, oldState=None, newState=None, triggername=None):
     if not triggername:
         triggername = itemName
 
-    return Trigger(triggername, "core.ItemStateChangeTrigger", Configuration({
+    return _buildTrigger(triggername, "core.ItemStateChangeTrigger", Configuration({
         "itemName": itemName,
         "state": str(newState) if newState else None,
         "oldState": str(oldState) if oldState else None
@@ -45,7 +52,7 @@ def UpdatedEventTrigger(itemName, state=None, triggername=None):
     if not triggername:
         triggername = itemName
 
-    return Trigger(triggername, "core.ItemStateUpdateTrigger", Configuration({
+    return _buildTrigger(triggername, "core.ItemStateUpdateTrigger", Configuration({
         "itemName": itemName,
         "state": str(state) if state else None
     }))
@@ -61,10 +68,10 @@ def CommandEventTrigger(itemName, command=None, triggername=None):
     if command:
         cfg["command"] = str(command)
 
-    return Trigger(triggername, "core.ItemCommandTrigger", Configuration(cfg))
+    return _buildTrigger(triggername, "core.ItemCommandTrigger", Configuration(cfg))
 
 def TimerTrigger(expression, triggername=None):
-    return Trigger(triggername, "timer.GenericCronTrigger", Configuration({
+    return _buildTrigger(triggername, "timer.GenericCronTrigger", Configuration({
         "cronExpression": expression
     }))
 
@@ -100,8 +107,42 @@ class OpenhabTimer(object):
         self.timer.cancel()
 
 from org.slf4j import LoggerFactory
+from org.osgi.framework import FrameworkUtil
+
+class osgi(object):
+    @staticmethod
+    def get_service(class_or_name):
+        _bundle = FrameworkUtil.getBundle(type(scriptExtension))
+        bundle_context = _bundle.getBundleContext() if _bundle else None
+        if bundle_context:
+            classname = class_or_name.getName() if isinstance(class_or_name, type) else class_or_name
+            ref = bundle_context.getServiceReference(classname)
+            return bundle_context.getService(ref) if ref else None
+
+    @staticmethod
+    def find_services(class_name, filter):
+        _bundle = FrameworkUtil.getBundle(type(scriptExtension))
+        bundle_context = _bundle.getBundleContext() if _bundle else None
+        if bundle_context:
+            refs = bundle_context.getAllServiceReferences(class_name, filter)
+            if refs:
+                return [bundle_context.getService(ref) for ref in refs]
 
 class oh(object):
+    @staticmethod
+    def getActions():
+        oh1_actions = osgi.find_services("org.openhab.core.scriptengine.action.ActionService", None) or []
+        oh2_actions = osgi.find_services("org.eclipse.smarthome.model.script.engine.action.ActionService", None) or []
+
+        return oh1_actions + oh2_actions
+
+    @staticmethod
+    def getAction(actionName):
+        for action in oh.getActions():
+            if actionName in action.__class__.__name__:
+                return action.actionClass
+        return None
+
     @staticmethod
     def getState(itemName):
         return unicode(ir.getItem(itemName).state)
@@ -147,7 +188,7 @@ class Event(defaultdict):
     def __getattr__(self, name):
         return self[name]
 
-
+import traceback
 class Oh1Rule(SimpleRule):
     def __init__(self, rule):
         try:
@@ -174,19 +215,22 @@ class Oh1Rule(SimpleRule):
         self.rule = rule
         self.rule.log = self.log
         try:
-            self.triggers.extend(rule.getEventTrigger())
+            self.triggers.extend(rule.getEventTriggers())
             self.conditions.extend(rule.getConditions())
         except Exception, ex:
-            self.log.error("exception " + str(ex))
+            pass
 
     def execute(self, module, inputs):
-        self.rule.module = module
-        self.rule.inputs = inputs
-        self.rule.execute(inputs.get("event"))
+        try:
+            self.rule.module = module
+            self.rule.inputs = inputs
+            self.rule.execute(inputs.get("event"))
+        except Exception, ex:
+            self.log.error("could not execute: {}", traceback.format_exc())
 
 
 class EmptyRule(object):
-    pass
+    log = LoggerFactory.getLogger("org.eclipse.smarthome.automation.rules.EmptyRule")
 
 def oh1Rule(rule):
     return Oh1Rule(rule)
@@ -194,7 +238,9 @@ def oh1Rule(rule):
 def ohInit(hr, rules):
     for rule in rules:
         try:
-            addedRule = hr.addRule(oh1Rule(rule))
+            pyRule = oh1Rule(rule)
+            addedRule = hr.addRule(pyRule)
+            LoggerFactory.getLogger("org.eclipse.smarthome.automation.rules.OHINIT").info("new rule: {}", pyRule.name)
 
             try:
                 rule.uid = addedRule.uid
@@ -202,10 +248,9 @@ def ohInit(hr, rules):
                 pass
 
         except Exception, ex:
-            print "error adding", ex
+            LoggerFactory.getLogger("org.eclipse.smarthome.automation.rules.OHINIT").error("error adding {}", ex)
 
-import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider as ScriptExtensionProvider
-import org.eclipse.smarthome.automation.module.script.internal.ScriptExtensionManager as sem
+import org.openhab.core.automation.module.script.ScriptExtensionProvider as ScriptExtensionProvider
 
 class Oh1Compat(ScriptExtensionProvider):
     def getDefaultPresets(self):
@@ -233,13 +278,14 @@ class Oh1Compat(ScriptExtensionProvider):
             "StartupTrigger": StartupTrigger
         }
 
-    def unLoad(self, scriptEngineId):
+    def unload(self, scriptEngineId):
         return
 
 oh1compat = Oh1Compat()
 
 def scriptLoaded(id):
-    sem.addExtension(oh1compat)
+    se.addScriptExtensionProvider(oh1compat)
 
 def scriptUnloaded():
-    sem.removeExtension(oh1compat)
+    se.removeScriptExtensionProvider(oh1compat)
+
